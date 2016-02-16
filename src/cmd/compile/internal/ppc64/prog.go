@@ -73,6 +73,7 @@ var progtable = [ppc64.ALAST]obj.ProgInfo{
 	ppc64.AFCFID:  {Flags: gc.SizeF | gc.LeftRead | gc.RegRead | gc.RightWrite},
 	ppc64.AFCMPU:  {Flags: gc.SizeD | gc.LeftRead | gc.RightRead},
 	ppc64.AFRSP:   {Flags: gc.SizeD | gc.LeftRead | gc.RightWrite | gc.Conv},
+	ppc64.AFSQRT:  {Flags: gc.SizeD | gc.LeftRead | gc.RightWrite},
 
 	// Moves
 	ppc64.AMOVB:  {Flags: gc.SizeB | gc.LeftRead | gc.RightWrite | gc.Move | gc.Conv},
