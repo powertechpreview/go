@@ -1519,6 +1519,44 @@ func elfshname(name string) *ElfShdr {
 	return nil
 }
 
+// Create an ElfShdr for the section with name.
+// Create a duplicate if one already exists with that name
+func elfshnamedup(name string) *ElfShdr {
+	var off int
+	var sh *ElfShdr
+
+	for i := 0; i < nelfstr; i++ {
+		if name == elfstr[i].s {
+			off = elfstr[i].off
+			sh = newElfShdr(int64(off))
+			return sh
+		}
+	}
+
+	Diag("cannot find elf name %s", name)
+	errorexit()
+	return nil
+}
+
+// Same as elfshalloc but done for those with duplicate
+// names.  An ElfShdr is created, the Elfsect field set
+// to the new ElfShdr, assuming the caller knows it should be
+// created.
+func elfshallocdup(sect *Section) *ElfShdr {
+
+	// Find the elfstring name offset
+	for i := 0; i < nelfstr; i++ {
+		if sect.Name == elfstr[i].s {
+			off := elfstr[i].off
+			sect.Elfsect = newElfShdr(int64(off))
+			return sect.Elfsect
+		}
+	}
+	Diag("cannot find elf name %s", sect.Name)
+	errorexit()
+	return nil
+}
+
 func elfshalloc(sect *Section) *ElfShdr {
 	sh := elfshname(sect.Name)
 	sect.Elfsect = sh
@@ -1526,7 +1564,23 @@ func elfshalloc(sect *Section) *ElfShdr {
 }
 
 func elfshbits(sect *Section) *ElfShdr {
-	sh := elfshalloc(sect)
+	var sh *ElfShdr
+
+	// Don't use elfshalloc to look up sections named
+	// .text in case there is more than one.
+	// If the Elfsect field has been set, use it,
+	// otherwise create a new ElfShdr for it.
+
+	if sect.Name == ".text" {
+		if sect.Elfsect == nil {
+			sh = elfshallocdup(sect)
+		} else {
+			sh = sect.Elfsect
+		}
+	} else {
+		sh = elfshalloc(sect)
+	}
+
 	// If this section has already been set up as a note, we assume type_ and
 	// flags are already correct, but the other fields still need filling in.
 	if sh.type_ == SHT_NOTE {
@@ -1604,6 +1658,11 @@ func elfshreloc(sect *Section) *ElfShdr {
 
 	buf := fmt.Sprintf("%s%s", prefix, sect.Name)
 	sh := elfshname(buf)
+	if sect.Name == ".text" {
+		if sh.info != 0 && sh.info != uint32(sect.Elfsect.shnum) {
+			sh = elfshnamedup(prefix + sect.Name)
+		}
+	}
 	sh.type_ = uint32(typ)
 	sh.entsize = uint64(Thearch.Regsize) * 2
 	if typ == SHT_RELA {
@@ -1677,9 +1736,12 @@ func Elfemitreloc() {
 		Cput(0)
 	}
 
-	elfrelocsect(Segtext.Sect, Ctxt.Textp)
-	for sect := Segtext.Sect.Next; sect != nil; sect = sect.Next {
-		elfrelocsect(sect, datap)
+	for sect := Segtext.Sect; sect != nil; sect = sect.Next {
+		if sect.Name == ".text" {
+			elfrelocsect(sect, Ctxt.Textp)
+		} else {
+			elfrelocsect(sect, datap)
+		}
 	}
 	for sect := Segrodata.Sect; sect != nil; sect = sect.Next {
 		elfrelocsect(sect, datap)
@@ -2041,8 +2103,20 @@ func Asmbelfsetup() {
 	/* This null SHdr must appear before all others */
 	elfshname("")
 
+	// The first text section can be looked up by name. The
+	// call to elfshalloc will return the first .text section.
 	for sect := Segtext.Sect; sect != nil; sect = sect.Next {
-		elfshalloc(sect)
+
+		// Don't use elfshalloc for .text in case there are multiple
+		// .text sections.  Instead check the Elfsect field to determine
+		// if already has an ElfShdr and if not, create one.
+		if sect.Name == ".text" {
+			if sect.Elfsect == nil {
+				elfshallocdup(sect)
+			}
+		} else {
+			elfshalloc(sect)
+		}
 	}
 	for sect := Segrodata.Sect; sect != nil; sect = sect.Next {
 		elfshalloc(sect)

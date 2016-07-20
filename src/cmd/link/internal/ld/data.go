@@ -1678,6 +1678,21 @@ func textaddress() {
 		} else {
 			va += uint64(sym.Size)
 		}
+		// On ppc64x a text section should not be larger than 2^26 bytes.  The bl instruction
+		// does not allow offsets that large and the GNU linker does not expect a single
+		// text section to be that large.  With multiple smaller text sections, the linker
+		// can modify the long calls appropriately despite the final total text size.  The
+		// limit used is below 2^26 bytes to allow space for tables the linker might insert.
+
+		if Iself && Linkmode == LinkExternal && Thearch.Thechar == '9' && va-sect.Vaddr > uint64(0x1c00000) {
+
+			// Set the length for the previous text section
+			sect.Length = va - sect.Vaddr
+
+			// Create new section, set the starting Vaddr
+			sect = addsection(&Segtext, ".text", 05)
+			sect.Vaddr = va
+		}
 	}
 
 	sect.Length = va - sect.Vaddr
@@ -1764,11 +1779,17 @@ func address() {
 	Segdata.Filelen = bss.Vaddr - Segdata.Vaddr
 
 	text := Segtext.Sect
+	textlen := text.Length
 	var rodata *Section
 	if Segrodata.Sect != nil {
 		rodata = Segrodata.Sect
 	} else {
-		rodata = text.Next
+		t := text.Next
+		// Check for multiple .text sections; should be consecutive
+		for ; t != nil && t.Name == ".text"; t = t.Next {
+			textlen += t.Length
+		}
+		rodata = t
 	}
 	typelink := rodata.Next
 	if UseRelro() {
@@ -1798,7 +1819,7 @@ func address() {
 	}
 
 	xdefine("runtime.text", obj.STEXT, int64(text.Vaddr))
-	xdefine("runtime.etext", obj.STEXT, int64(text.Vaddr+text.Length))
+	xdefine("runtime.etext", obj.STEXT, int64(text.Vaddr+textlen))
 	xdefine("runtime.rodata", obj.SRODATA, int64(rodata.Vaddr))
 	xdefine("runtime.erodata", obj.SRODATA, int64(rodata.Vaddr+rodata.Length))
 	xdefine("runtime.typelink", obj.SRODATA, int64(typelink.Vaddr))

@@ -840,12 +840,14 @@ func asmb() {
 		ld.Asmbelfsetup()
 	}
 
-	sect := ld.Segtext.Sect
-	ld.Cseek(int64(sect.Vaddr - ld.Segtext.Vaddr + ld.Segtext.Fileoff))
-	ld.Codeblk(int64(sect.Vaddr), int64(sect.Length))
-	for sect = sect.Next; sect != nil; sect = sect.Next {
+	for sect := ld.Segtext.Sect; sect != nil; sect = sect.Next {
 		ld.Cseek(int64(sect.Vaddr - ld.Segtext.Vaddr + ld.Segtext.Fileoff))
-		ld.Datblk(int64(sect.Vaddr), int64(sect.Length))
+		// Might have multiple text sections
+		if sect.Name == ".text" {
+			ld.Codeblk(int64(sect.Vaddr), int64(sect.Length))
+		} else {
+			ld.Datblk(int64(sect.Vaddr), int64(sect.Length))
+		}
 	}
 
 	if ld.Segrodata.Filelen > 0 {

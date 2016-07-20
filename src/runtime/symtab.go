@@ -220,12 +220,24 @@ func findfunc(pc uintptr) *_func {
 	ffb := (*findfuncbucket)(add(unsafe.Pointer(datap.findfunctab), b*unsafe.Sizeof(findfuncbucket{})))
 	idx := ffb.idx + uint32(ffb.subbuckets[i])
 	if pc < datap.ftab[idx].entry {
-		throw("findfunc: bad findfunctab entry")
-	}
+
+		// In the case of multiple text sections with external linking,
+		// the pc values used to build the buckets might not match the
+		// pc values after linking.  That just means the buckets don't
+		// match up as expected; search back to find the right one.
+
+		for idx > 0 && datap.ftab[idx].entry > pc {
+			idx--
+		}
+		if idx == 0 {
+			throw("findfunc: bad findfunctab entry")
+		}
+	} else {
 
 	// linear search to find func with pc >= entry.
-	for datap.ftab[idx+1].entry <= pc {
-		idx++
+		for datap.ftab[idx+1].entry <= pc {
+			idx++
+		}
 	}
 	return (*_func)(unsafe.Pointer(&datap.pclntable[datap.ftab[idx].funcoff]))
 }
