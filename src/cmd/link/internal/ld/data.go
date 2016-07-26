@@ -527,7 +527,15 @@ func relocsym(s *LSym) {
 			o = Symaddr(r.Sym) + r.Add - int64(r.Sym.Sect.Vaddr)
 
 		case obj.R_ADDROFF:
-			o = Symaddr(r.Sym) - int64(r.Sym.Sect.Vaddr) + r.Add
+
+			// The method offset tables using this relocation expect the offset to be relative
+			// to the start of the first text section, even if there are multiple.
+
+			if Linkmode == LinkExternal && r.Sym.Sect.Name == ".text" && r.Sym.Sect.Vaddr != Segtext.Vaddr {
+				o = Symaddr(r.Sym) - int64(Segtext.Vaddr) + r.Add
+			} else {
+				o = Symaddr(r.Sym) - int64(r.Sym.Sect.Vaddr) + r.Add
+			}
 
 			// r->sym can be null when CALL $(constant) is transformed from absolute PC to relative PC call.
 		case obj.R_CALL, obj.R_GOTPCREL, obj.R_PCREL:
@@ -1926,6 +1934,7 @@ func textaddress() {
 	}
 	va := uint64(INITTEXT)
 	sect.Vaddr = va
+	n := 1
 	for _, sym := range Ctxt.Textp {
 		sym.Sect = sect
 		if sym.Type&obj.SSUB != 0 {
@@ -1948,9 +1957,30 @@ func textaddress() {
 		} else {
 			va += uint64(sym.Size)
 		}
+		// On ppc64x a text section should not be larger than 2^26 bytes due to the size of
+		// call target offset field in the bl instruction.  Splitting into text
+		// sections smaller than this limit allows the GNU linker to modify the long calls
+		// appropriately.  The limit allows for the space for linker tables.
+
+		// Only break at outermost syms.
+
+		if sym.Outer == nil && Iself && Linkmode == LinkExternal && SysArch.InFamily(sys.PPC64) && va-sect.Vaddr > uint64(0x1c00000) {
+
+			// Set the length for the previous text section
+			sect.Length = va - sect.Vaddr
+
+			// Create new section, set the starting Vaddr
+			sect = addsection(&Segtext, ".text", 05)
+			sect.Vaddr = va
+
+			// Create a symbol for the start and end of the secondary text section
+			Linklookup(Ctxt, fmt.Sprintf("runtime.text.%d", n), 0).Sect = sect
+			n++
+		}
 	}
 
 	sect.Length = va - sect.Vaddr
+	Linklookup(Ctxt, "runtime.etext", 0).Sect = sect
 }
 
 // assign addresses
@@ -2057,11 +2087,27 @@ func address() {
 	Segdwarf.Filelen = va - Segdwarf.Vaddr
 
 	text := Segtext.Sect
+	lasttext := text
 	var rodata *Section
 	if Segrodata.Sect != nil {
 		rodata = Segrodata.Sect
 	} else {
-		rodata = text.Next
+		// Could be multiple .text sections
+		n := 1
+		for sect := Segtext.Sect.Next; sect != nil; sect = sect.Next {
+			if sect.Name != ".text" {
+				break
+			}
+			lasttext = sect
+			symname := fmt.Sprintf("runtime.text.%d", n)
+			xdefine(symname, obj.STEXT, int64(sect.Vaddr))
+			n++
+		}
+
+		rodata = lasttext.Next
+		if rodata != nil && rodata.Name != ".rodata" {
+			Diag("Unexpected section order in text segment")
+		}
 	}
 	var relrodata *Section
 	typelink := rodata.Next
@@ -2108,7 +2154,7 @@ func address() {
 	}
 
 	xdefine("runtime.text", obj.STEXT, int64(text.Vaddr))
-	xdefine("runtime.etext", obj.STEXT, int64(text.Vaddr+text.Length))
+	xdefine("runtime.etext", obj.STEXT, int64(lasttext.Vaddr+lasttext.Length))
 	if HEADTYPE == obj.Hwindows {
 		xdefine(".text", obj.STEXT, int64(text.Vaddr))
 	}

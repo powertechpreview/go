@@ -257,7 +257,21 @@ func (t *_type) textOff(off textOff) unsafe.Pointer {
 		}
 		return res
 	}
-	res := md.text + uintptr(off)
+	res := uintptr(0)
+
+	// Find the text section range that contains the offset to determine the section's base
+	// address.  In cases where there are multiple text sections, the base address might be
+	// relocated by the linker.
+
+	for i := 0; i < len(md.textsectmap); i++ {
+		sectaddr := md.textsectmap[i].vaddr
+		sectlen := md.textsectmap[i].length
+		if uint64(off) >= sectaddr && uint64(off) <= sectaddr+sectlen {
+			res = md.textsectmap[i].baseaddr + uintptr(off) - uintptr(md.textsectmap[i].vaddr)
+			break
+		}
+	}
+
 	if res > md.etext {
 		println("runtime: textOff", hex(off), "out of range", hex(md.text), "-", hex(md.etext))
 		throw("runtime: text offset out of range")

@@ -1623,6 +1623,25 @@ func elfshname(name string) *ElfShdr {
 	return nil
 }
 
+// Create an ElfShdr for the section with name.
+// A new one is created even if one already exists with
+// the same name.
+func elfshnamedup(name string) *ElfShdr {
+	var off int
+	var sh *ElfShdr
+
+	for i := 0; i < nelfstr; i++ {
+		if name == elfstr[i].s {
+			off = elfstr[i].off
+			sh = newElfShdr(int64(off))
+			return sh
+		}
+	}
+	Diag("cannot find elf name %s", name)
+	errorexit()
+	return nil
+}
+
 func elfshalloc(sect *Section) *ElfShdr {
 	sh := elfshname(sect.Name)
 	sect.Elfsect = sh
@@ -1630,7 +1649,17 @@ func elfshalloc(sect *Section) *ElfShdr {
 }
 
 func elfshbits(sect *Section) *ElfShdr {
-	sh := elfshalloc(sect)
+	var sh *ElfShdr
+
+	if sect.Name == ".text" {
+		if sect.Elfsect == nil {
+			sect.Elfsect = elfshnamedup(sect.Name)
+		}
+		sh = sect.Elfsect
+	} else {
+		sh = elfshalloc(sect)
+	}
+
 	// If this section has already been set up as a note, we assume type_ and
 	// flags are already correct, but the other fields still need filling in.
 	if sh.type_ == SHT_NOTE {
@@ -1706,6 +1735,15 @@ func elfshreloc(sect *Section) *ElfShdr {
 	}
 
 	sh := elfshname(elfRelType + sect.Name)
+
+	// There could be multiple text sections but each needs
+	// its own .rela.text.
+	if sect.Name == ".text" {
+		if sh.info != 0 && sh.info != uint32(sect.Elfsect.shnum) {
+			sh = elfshnamedup(elfRelType + sect.Name)
+		}
+	}
+
 	sh.type_ = uint32(typ)
 	sh.entsize = uint64(SysArch.RegSize) * 2
 	if typ == SHT_RELA {
@@ -1776,9 +1814,12 @@ func Elfemitreloc() {
 		Cput(0)
 	}
 
-	elfrelocsect(Segtext.Sect, Ctxt.Textp)
-	for sect := Segtext.Sect.Next; sect != nil; sect = sect.Next {
-		elfrelocsect(sect, datap)
+	for sect := Segtext.Sect; sect != nil; sect = sect.Next {
+		if sect.Name == ".text" {
+			elfrelocsect(sect, Ctxt.Textp)
+		} else {
+			elfrelocsect(sect, datap)
+		}
 	}
 	for sect := Segrodata.Sect; sect != nil; sect = sect.Next {
 		elfrelocsect(sect, datap)
@@ -2109,7 +2150,16 @@ func Asmbelfsetup() {
 	elfshname("")
 
 	for sect := Segtext.Sect; sect != nil; sect = sect.Next {
-		elfshalloc(sect)
+
+		// There could be multiple .text sections. Instead check the Elfsect
+		// field to determine if already has an ElfShdr and if not, create one.
+		if sect.Name == ".text" {
+			if sect.Elfsect == nil {
+				sect.Elfsect = elfshnamedup(sect.Name)
+			}
+		} else {
+			elfshalloc(sect)
+		}
 	}
 	for sect := Segrodata.Sect; sect != nil; sect = sect.Next {
 		elfshalloc(sect)

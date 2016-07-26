@@ -315,6 +315,62 @@ func (libs byPkg) Swap(a, b int) {
 	libs[a], libs[b] = libs[b], libs[a]
 }
 
+// Create a table with information on the text sections.
+
+func textsectionmap() uint32 {
+
+	t := Linklookup(Ctxt, "runtime.textsectionmap", 0)
+	t.Type = obj.SRODATA
+	t.Attr |= AttrReachable
+	nsections := int64(0)
+
+	for sect := Segtext.Sect; sect != nil; sect = sect.Next {
+		if sect.Name == ".text" {
+			nsections++
+		} else {
+			break
+		}
+	}
+	Symgrow(Ctxt, t, nsections*3*8)
+
+	off := int64(0)
+	n := 0
+
+	// The vaddr for each text section is the difference between the section's
+	// Vaddr and the Vaddr for the first text section as determined at compile
+	// time.
+
+	// The symbol name for the start address of the first text section is
+	// runtime.text.  Additional text sections are named runtime.text.n where n is the
+	// order of creation starting with 1. These symbols provide the section's
+	// start address after relocation by the linker.
+
+	textbase := Segtext.Sect.Vaddr
+	for sect := Segtext.Sect; sect != nil; sect = sect.Next {
+		if sect.Name != ".text" {
+			break
+		}
+		off = setuintxx(Ctxt, t, off, sect.Vaddr-textbase, int64(SysArch.IntSize))
+		off = setuintxx(Ctxt, t, off, sect.Length, int64(SysArch.IntSize))
+		if n == 0 {
+			s := Linkrlookup(Ctxt, "runtime.text", 0)
+			if s == nil {
+				Diag("Unable to find symbol runtime.text\n")
+			}
+			off = setaddr(Ctxt, t, off, s)
+
+		} else {
+			s := Linklookup(Ctxt, fmt.Sprintf("runtime.text.%d", n), 0)
+			if s == nil {
+				Diag("Unable to find symbol runtime.text.%d\n", n)
+			}
+			off = setaddr(Ctxt, t, off, s)
+		}
+		n++
+	}
+	return uint32(n)
+}
+
 func symtab() {
 	dosymtype()
 
@@ -489,6 +545,8 @@ func symtab() {
 		adduint(Ctxt, abihashgostr, uint64(hashsym.Size))
 	}
 
+	nsections := textsectionmap()
+
 	// Information about the layout of the executable image for the
 	// runtime to use. Any changes here must be matched by changes to
 	// the definition of moduledata in runtime/symtab.go.
@@ -527,6 +585,12 @@ func symtab() {
 	Addaddr(Ctxt, moduledata, Linklookup(Ctxt, "runtime.gcbss", 0))
 	Addaddr(Ctxt, moduledata, Linklookup(Ctxt, "runtime.types", 0))
 	Addaddr(Ctxt, moduledata, Linklookup(Ctxt, "runtime.etypes", 0))
+
+	// text section information
+	Addaddr(Ctxt, moduledata, Linklookup(Ctxt, "runtime.textsectionmap", 0))
+	adduint(Ctxt, moduledata, uint64(nsections))
+	adduint(Ctxt, moduledata, uint64(nsections))
+
 	// The typelinks slice
 	Addaddr(Ctxt, moduledata, Linklookup(Ctxt, "runtime.typelink", 0))
 	adduint(Ctxt, moduledata, uint64(ntypelinks))

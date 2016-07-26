@@ -1956,6 +1956,26 @@ func genasmsym(put func(*LSym, string, int, int64, int64, int, *LSym)) {
 	if s.Type == obj.STEXT {
 		put(s, s.Name, 'T', s.Value, s.Size, int(s.Version), nil)
 	}
+	n := 0
+
+	// Generate base addresses for all text sections if there are multiple
+	for sect := Segtext.Sect; sect != nil; sect = sect.Next {
+		if n == 0 {
+			n++
+			continue
+		}
+		if sect.Name != ".text" {
+			break
+		}
+		s = Linkrlookup(Ctxt, fmt.Sprintf("runtime.text.%d", n), 0)
+		if s == nil {
+			break
+		}
+		if s.Type == obj.STEXT {
+			put(s, s.Name, 'T', s.Value, s.Size, int(s.Version), nil)
+		}
+		n++
+	}
 	s = Linklookup(Ctxt, "runtime.etext", 0)
 	if s.Type == obj.STEXT {
 		put(s, s.Name, 'T', s.Value, s.Size, int(s.Version), nil)
