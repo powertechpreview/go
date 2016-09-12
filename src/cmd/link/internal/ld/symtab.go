@@ -331,7 +331,7 @@ func textsectionmap() uint32 {
 			break
 		}
 	}
-	Symgrow(Ctxt, t, nsections*3*8)
+	Symgrow(Ctxt, t, nsections*(2*int64(SysArch.IntSize)+int64(SysArch.PtrSize)))
 
 	off := int64(0)
 	n := 0
