@@ -259,17 +259,25 @@ func (t *_type) textOff(off textOff) unsafe.Pointer {
 	}
 	res := uintptr(0)
 
-	// Find the text section range that contains the offset to determine the section's base
-	// address.  In cases where there are multiple text sections, the base address might be
-	// relocated by the linker.
+	// The text, or instruction stream is generated as one large buffer.  The off (offset) for a method is
+	// its offset within this buffer.  If the total text size gets too large, there can be issues on platforms like ppc64 if
+	// the target of calls are too far for the call instruction.  To resolve the large text issue, the text is split
+	// into multiple text sections to allow the linker to generate long calls when necessary.  When this happens, the vaddr
+	// for each text section is set to its offset within the text.  Each method's offset is compared against the section
+	// vaddrs and sizes to determine the containing section.  Then the section relative offset is added to the section's
+	// relocated baseaddr to compute the method addess.
 
-	for i := 0; i < len(md.textsectmap); i++ {
-		sectaddr := md.textsectmap[i].vaddr
-		sectlen := md.textsectmap[i].length
-		if uint64(off) >= sectaddr && uint64(off) <= sectaddr+sectlen {
-			res = md.textsectmap[i].baseaddr + uintptr(off) - uintptr(md.textsectmap[i].vaddr)
-			break
+	if len(md.textsectmap) > 1 {
+		for i := 0; i < len(md.textsectmap); i++ {
+			sectaddr := md.textsectmap[i].vaddr
+			sectlen := md.textsectmap[i].length
+			if uint64(off) >= sectaddr && uint64(off) <= sectaddr+sectlen {
+				res = md.textsectmap[i].baseaddr + uintptr(off) - uintptr(md.textsectmap[i].vaddr)
+				break
+			}
 		}
+	} else {
+		res = md.text + uintptr(off)
 	}
 
 	if res > md.etext {

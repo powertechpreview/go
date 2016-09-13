@@ -531,7 +531,7 @@ func relocsym(s *LSym) {
 			// The method offset tables using this relocation expect the offset to be relative
 			// to the start of the first text section, even if there are multiple.
 
-			if Linkmode == LinkExternal && r.Sym.Sect.Name == ".text" && r.Sym.Sect.Vaddr != Segtext.Vaddr {
+			if r.Sym.Sect.Name == ".text" {
 				o = Symaddr(r.Sym) - int64(Segtext.Vaddr) + r.Add
 			} else {
 				o = Symaddr(r.Sym) - int64(r.Sym.Sect.Vaddr) + r.Add
@@ -1928,7 +1928,6 @@ func textaddress() {
 
 	sect.Align = int32(Funcalign)
 	Linklookup(Ctxt, "runtime.text", 0).Sect = sect
-	Linklookup(Ctxt, "runtime.etext", 0).Sect = sect
 	if HEADTYPE == obj.Hwindows {
 		Linklookup(Ctxt, ".text", 0).Sect = sect
 	}
@@ -1964,7 +1963,7 @@ func textaddress() {
 
 		// Only break at outermost syms.
 
-		if sym.Outer == nil && Iself && Linkmode == LinkExternal && SysArch.InFamily(sys.PPC64) && va-sect.Vaddr > uint64(0x1c00000) {
+		if sym.Outer == nil && Iself && Linkmode == LinkExternal && SysArch.InFamily(sys.PPC64) && va-sect.Vaddr > 0x1c00000 {
 
 			// Set the length for the previous text section
 			sect.Length = va - sect.Vaddr
@@ -1973,7 +1972,7 @@ func textaddress() {
 			sect = addsection(&Segtext, ".text", 05)
 			sect.Vaddr = va
 
-			// Create a symbol for the start and end of the secondary text section
+			// Create a symbol for the start of the secondary text section
 			Linklookup(Ctxt, fmt.Sprintf("runtime.text.%d", n), 0).Sect = sect
 			n++
 		}
@@ -2093,15 +2092,8 @@ func address() {
 		rodata = Segrodata.Sect
 	} else {
 		// Could be multiple .text sections
-		n := 1
-		for sect := Segtext.Sect.Next; sect != nil; sect = sect.Next {
-			if sect.Name != ".text" {
-				break
-			}
+		for sect := Segtext.Sect.Next; sect != nil && sect.Name == ".text"; sect = sect.Next {
 			lasttext = sect
-			symname := fmt.Sprintf("runtime.text.%d", n)
-			xdefine(symname, obj.STEXT, int64(sect.Vaddr))
-			n++
 		}
 
 		rodata = lasttext.Next
@@ -2155,6 +2147,14 @@ func address() {
 
 	xdefine("runtime.text", obj.STEXT, int64(text.Vaddr))
 	xdefine("runtime.etext", obj.STEXT, int64(lasttext.Vaddr+lasttext.Length))
+
+	n := 1
+	for sect := Segtext.Sect.Next; sect != nil && sect.Name == ".text"; sect = sect.Next {
+		symname := fmt.Sprintf("runtime.text.%d", n)
+		xdefine(symname, obj.STEXT, int64(sect.Vaddr))
+		n++
+	}
+
 	if HEADTYPE == obj.Hwindows {
 		xdefine(".text", obj.STEXT, int64(text.Vaddr))
 	}

@@ -1958,7 +1958,7 @@ func genasmsym(put func(*LSym, string, int, int64, int64, int, *LSym)) {
 	}
 	n := 0
 
-	// Generate base addresses for all text sections if there are multiple
+	// Generate base addresses for all text sections if there are multiple.
 	for sect := Segtext.Sect; sect != nil; sect = sect.Next {
 		if n == 0 {
 			n++
