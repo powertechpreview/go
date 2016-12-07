@@ -1971,6 +1971,7 @@ func textaddress() {
 			// Create new section, set the starting Vaddr
 			sect = addsection(&Segtext, ".text", 05)
 			sect.Vaddr = va
+			sym.Sect = sect
 
 			// Create a symbol for the start of the secondary text section
 			Linklookup(Ctxt, fmt.Sprintf("runtime.text.%d", n), 0).Sect = sect
