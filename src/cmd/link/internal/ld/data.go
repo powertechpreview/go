@@ -1951,10 +1951,9 @@ func textaddress() {
 		if sym.Size == 0 && sym.Sub != nil {
 			Ctxt.Cursym = sym
 		}
-		if sym.Size < MINFUNC {
-			va += MINFUNC // spacing required for findfunctab
-		} else {
-			va += uint64(sym.Size)
+		funcsize := uint64(MINFUNC)
+		if sym.Size > MINFUNC {
+			funcsize = uint64(sym.Size)
 		}
 		// On ppc64x a text section should not be larger than 2^26 bytes due to the size of
 		// call target offset field in the bl instruction.  Splitting into text
@@ -1963,7 +1962,7 @@ func textaddress() {
 
 		// Only break at outermost syms.
 
-		if sym.Outer == nil && Iself && Linkmode == LinkExternal && SysArch.InFamily(sys.PPC64) && va-sect.Vaddr > 0x1c00000 {
+		if sym.Outer == nil && Iself && Linkmode == LinkExternal && SysArch.InFamily(sys.PPC64) && va-sect.Vaddr+funcsize > 0x1c00000 {
 
 			// Set the length for the previous text section
 			sect.Length = va - sect.Vaddr
@@ -1977,6 +1976,7 @@ func textaddress() {
 			Linklookup(Ctxt, fmt.Sprintf("runtime.text.%d", n), 0).Sect = sect
 			n++
 		}
+		va += funcsize
 	}
 
 	sect.Length = va - sect.Vaddr
