@@ -40,7 +40,7 @@ import (
 // Instruction layout.
 
 const (
-	funcAlign = 8
+	funcAlign = 16
 )
 
 const (
