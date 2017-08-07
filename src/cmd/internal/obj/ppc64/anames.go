@@ -458,6 +458,8 @@ var Anames = []string{
 	"VCMPGTSD",
 	"VCMPGTSDCC",
 	"VPERM",
+	"VBPERMQ",
+	"VBPERMD",
 	"VSEL",
 	"VSPLT",
 	"VSPLTB",
