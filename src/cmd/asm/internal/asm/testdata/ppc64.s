@@ -706,6 +706,10 @@ label1:
 //	}
 	DCBF	(R1)
 	DCBF	(R1+R2) // DCBF	(R1)(R2*1)
+	DCBF	(R1), $1
+	DCBF	(R1)(R2*1), $1
+	DCBT	(R1), $1
+	DCBT	(R1)(R2*1), $1
 
 //	Population count, X-form
 //	<MNEMONIC> RS,RA produces
