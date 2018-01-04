@@ -177,16 +177,17 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 
 	case ssa.OpPPC64LoweredAtomicAnd8,
 		ssa.OpPPC64LoweredAtomicOr8:
-		// SYNC
+		// LWSYNC
 		// LBAR		(Rarg0), Rtmp
 		// AND/OR	Rarg1, Rtmp
 		// STBCCC	Rtmp, (Rarg0)
 		// BNE		-3(PC)
-		// ISYNC
 		r0 := v.Args[0].Reg()
 		r1 := v.Args[1].Reg()
-		psync := s.Prog(ppc64.ASYNC)
-		psync.To.Type = obj.TYPE_NONE
+		// LWSYNC - Assuming shared data not write-through-required nor
+		// caching-inhibited. See Appendix B.2.2.2 in the ISA 2.07b.
+		plwsync := s.Prog(ppc64.ALWSYNC)
+		plwsync.To.Type = obj.TYPE_NONE
 		p := s.Prog(ppc64.ALBAR)
 		p.From.Type = obj.TYPE_MEM
 		p.From.Reg = r0
@@ -206,17 +207,14 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p3 := s.Prog(ppc64.ABNE)
 		p3.To.Type = obj.TYPE_BRANCH
 		gc.Patch(p3, p)
-		pisync := s.Prog(ppc64.AISYNC)
-		pisync.To.Type = obj.TYPE_NONE
 
 	case ssa.OpPPC64LoweredAtomicAdd32,
 		ssa.OpPPC64LoweredAtomicAdd64:
-		// SYNC
+		// LWSYNC
 		// LDAR/LWAR    (Rarg0), Rout
 		// ADD		Rarg1, Rout
 		// STDCCC/STWCCC Rout, (Rarg0)
 		// BNE         -3(PC)
-		// ISYNC
 		// MOVW		Rout,Rout (if Add32)
 		ld := ppc64.ALDAR
 		st := ppc64.ASTDCCC
@@ -227,9 +225,10 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		r0 := v.Args[0].Reg()
 		r1 := v.Args[1].Reg()
 		out := v.Reg0()
-		// SYNC
-		psync := s.Prog(ppc64.ASYNC)
-		psync.To.Type = obj.TYPE_NONE
+		// LWSYNC - Assuming shared data not write-through-required nor
+		// caching-inhibited. See Appendix B.2.2.2 in the ISA 2.07b.
+		plwsync := s.Prog(ppc64.ALWSYNC)
+		plwsync.To.Type = obj.TYPE_NONE
 		// LDAR or LWAR
 		p := s.Prog(ld)
 		p.From.Type = obj.TYPE_MEM
@@ -252,9 +251,6 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p4 := s.Prog(ppc64.ABNE)
 		p4.To.Type = obj.TYPE_BRANCH
 		gc.Patch(p4, p)
-		// ISYNC
-		pisync := s.Prog(ppc64.AISYNC)
-		pisync.To.Type = obj.TYPE_NONE
 
 		// Ensure a 32 bit result
 		if v.Op == ssa.OpPPC64LoweredAtomicAdd32 {
@@ -267,7 +263,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 
 	case ssa.OpPPC64LoweredAtomicExchange32,
 		ssa.OpPPC64LoweredAtomicExchange64:
-		// SYNC
+		// LWSYNC
 		// LDAR/LWAR    (Rarg0), Rout
 		// STDCCC/STWCCC Rout, (Rarg0)
 		// BNE         -2(PC)
@@ -281,9 +277,10 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		r0 := v.Args[0].Reg()
 		r1 := v.Args[1].Reg()
 		out := v.Reg0()
-		// SYNC
-		psync := s.Prog(ppc64.ASYNC)
-		psync.To.Type = obj.TYPE_NONE
+		// LWSYNC - Assuming shared data not write-through-required nor
+		// caching-inhibited. See Appendix B.2.2.2 in the ISA 2.07b.
+		plwsync := s.Prog(ppc64.ALWSYNC)
+		plwsync.To.Type = obj.TYPE_NONE
 		// LDAR or LWAR
 		p := s.Prog(ld)
 		p.From.Type = obj.TYPE_MEM
@@ -365,14 +362,14 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 
 	case ssa.OpPPC64LoweredAtomicCas64,
 		ssa.OpPPC64LoweredAtomicCas32:
-		// SYNC
+		// LWSYNC
 		// loop:
 		// LDAR        (Rarg0), Rtmp
 		// CMP         Rarg1, Rtmp
 		// BNE         fail
 		// STDCCC      Rarg2, (Rarg0)
 		// BNE         loop
-		// ISYNC
+		// LWSYNC
 		// MOVD        $1, Rout
 		// BR          end
 		// fail:
@@ -390,9 +387,10 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		r1 := v.Args[1].Reg()
 		r2 := v.Args[2].Reg()
 		out := v.Reg0()
-		// SYNC
-		psync := s.Prog(ppc64.ASYNC)
-		psync.To.Type = obj.TYPE_NONE
+		// LWSYNC - Assuming shared data not write-through-required nor
+		// caching-inhibited. See Appendix B.2.2.2 in the ISA 2.07b.
+		plwsync1 := s.Prog(ppc64.ALWSYNC)
+		plwsync1.To.Type = obj.TYPE_NONE
 		// LDAR or LWAR
 		p := s.Prog(ld)
 		p.From.Type = obj.TYPE_MEM
@@ -418,9 +416,10 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p4 := s.Prog(ppc64.ABNE)
 		p4.To.Type = obj.TYPE_BRANCH
 		gc.Patch(p4, p)
-		// ISYNC
-		pisync := s.Prog(ppc64.AISYNC)
-		pisync.To.Type = obj.TYPE_NONE
+		// LWSYNC - Assuming shared data not write-through-required nor
+		// caching-inhibited. See Appendix B.2.1.1 in the ISA 2.07b.
+		plwsync2 := s.Prog(ppc64.ALWSYNC)
+		plwsync2.To.Type = obj.TYPE_NONE
 		// return true
 		p5 := s.Prog(ppc64.AMOVD)
 		p5.From.Type = obj.TYPE_CONST
