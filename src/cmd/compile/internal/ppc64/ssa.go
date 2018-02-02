@@ -1088,7 +1088,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = ppc64.REG_CTR
 
-		if gc.Ctxt.Flag_shared && p.From.Reg != ppc64.REG_R12 {
+		if p.From.Reg != ppc64.REG_R12 {
 			// Make sure function pointer is in R12 as well when
 			// compiling Go into PIC.
 			// TODO(mwhudson): it would obviously be better to
