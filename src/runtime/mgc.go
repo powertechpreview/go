@@ -1158,7 +1158,7 @@ func (t gcTrigger) test() bool {
 	if t.kind == gcTriggerAlways {
 		return true
 	}
-	if gcphase != _GCoff || gcpercent < 0 {
+	if gcphase != _GCoff {
 		return false
 	}
 	switch t.kind {
@@ -1169,6 +1169,9 @@ func (t gcTrigger) test() bool {
 		// own write.
 		return memstats.heap_live >= memstats.gc_trigger
 	case gcTriggerTime:
+		if gcpercent < 0 {
+			return false
+		}
 		lastgc := int64(atomic.Load64(&memstats.last_gc_nanotime))
 		return lastgc != 0 && t.now-lastgc > forcegcperiod
 	case gcTriggerCycle:
@@ -1248,7 +1251,12 @@ func gcStart(mode gcMode, trigger gcTrigger) {
 
 	gcResetMarkState()
 
-	work.stwprocs, work.maxprocs = gcprocs(), gomaxprocs
+	work.stwprocs, work.maxprocs = gomaxprocs, gomaxprocs
+	if work.stwprocs > ncpu {
+		// This is used to compute CPU time of the STW phases,
+		// so it can't be more than ncpu, even if GOMAXPROCS is.
+		work.stwprocs = ncpu
+	}
 	work.heap0 = atomic.Load64(&memstats.heap_live)
 	work.pauseNS = 0
 	work.mode = mode
