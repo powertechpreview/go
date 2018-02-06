@@ -202,6 +202,7 @@ var allAsmTests = []*asmTests{
 	{
 		arch:  "ppc64le",
 		os:    "linux",
+		imports: []string{"encoding/binary"},
 		tests: linuxPPC64LETests,
 	},
 }
@@ -1664,6 +1665,55 @@ var linuxPPC64LETests = []*asmTest{
 		`,
 		[]string{"\tROTL\t"},
 	},
+	{
+		`
+		func f14(b []byte) uint16 {
+			return binary.LittleEndian.Uint16(b)
+		}
+		`,
+		[]string{"\tMOVHZ\t"},
+	},
+	{
+		`
+		func f15(b []byte) uint32 {
+			return binary.LittleEndian.Uint32(b)
+		}
+		`,
+		[]string{"\tMOVWZ\t"},
+	},
+	{
+		`
+		func f16(b []byte) uint64 {
+			return binary.LittleEndian.Uint64(b)
+		}
+		`,
+		[]string{"\tMOVD\t"},
+	},
+	{
+		`
+		func f17(b []byte, v uint16) {
+			binary.LittleEndian.PutUint16(b, v)
+		}
+		`,
+		[]string{"\tMOVH\t"},
+	},
+	{
+		`
+		func f18(b []byte, v uint32) {
+			binary.LittleEndian.PutUint32(b, v)
+		}
+		`,
+		[]string{"\tMOVW\t"},
+	},
+	{
+		`
+		func f19(b []byte, v uint64) {
+			binary.LittleEndian.PutUint64(b, v)
+		}
+		`,
+		[]string{"\tMOVD\t"},
+	},
+
 }
 
 // TestLineNumber checks to make sure the generated assembly has line numbers

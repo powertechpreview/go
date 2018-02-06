@@ -1950,7 +1950,7 @@ func (ctxt *Link) doelf() {
 		}
 	}
 
-	hasinitarr := *FlagLinkshared
+	hasinitarr := *FlagLinkshared || ctxt.CanUsePlugins()
 
 	/* shared library initializer */
 	switch Buildmode {

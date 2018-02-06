@@ -172,6 +172,11 @@ func (ctxt *Link) DynlinkingGo() bool {
 	return Buildmode == BuildmodeShared || *FlagLinkshared || Buildmode == BuildmodePlugin || canUsePlugins
 }
 
+// CanUsePlugins returns whether a plugins can be used
+func (ctxt *Link) CanUsePlugins() bool {
+	return ctxt.Syms.ROLookup("plugin.Open", 0) != nil
+}
+
 // UseRelro returns whether to make use of "read only relocations" aka
 // relro.
 func UseRelro() bool {

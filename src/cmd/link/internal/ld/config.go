@@ -63,7 +63,7 @@ func (mode *BuildMode) Set(s string) error {
 		*mode = BuildmodeCArchive
 	case "c-shared":
 		switch objabi.GOARCH {
-		case "386", "amd64", "arm", "arm64":
+		case "386", "amd64", "arm", "arm64", "ppc64le":
 		default:
 			return badmode()
 		}
@@ -84,7 +84,7 @@ func (mode *BuildMode) Set(s string) error {
 		switch objabi.GOOS {
 		case "linux":
 			switch objabi.GOARCH {
-			case "386", "amd64", "arm", "arm64", "s390x":
+			case "386", "amd64", "arm", "arm64", "s390x", "ppc64le":
 			default:
 				return badmode()
 			}
