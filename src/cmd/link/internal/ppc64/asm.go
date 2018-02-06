@@ -160,6 +160,7 @@ func genaddmoduledata(ctxt *ld.Link) {
 	rel = ld.Addrel(initfunc)
 	rel.Off = int32(initfunc.Size)
 	rel.Siz = 8
+	// Find the correct moduledata
 	if s := ctxt.Syms.ROLookup("local.moduledata", 0); s != nil {
 		rel.Sym = s
 	} else if s := ctxt.Syms.ROLookup("local.pluginmoduledata", 0); s != nil {
