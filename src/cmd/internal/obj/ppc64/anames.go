@@ -240,6 +240,8 @@ var Anames = []string{
 	"FRIPCC",
 	"FRIZ",
 	"FRIZCC",
+	"FRIN",
+	"FRINCC",
 	"FRSQRTE",
 	"FRSQRTECC",
 	"FSEL",
